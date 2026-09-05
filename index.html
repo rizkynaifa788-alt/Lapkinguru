@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laporan Kinerja Harian - MIN 1 KOTIM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://unpkg.com/docx@7.8.2/build/index.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        
+        @media print {
+            body { background-color: white !important; padding: 0 !important; }
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            .print-container { 
+                width: 100% !important; 
+                max-width: 100% !important; 
+                margin: 0 !important; 
+                padding: 0 !important;
+                box-shadow: none !important;
+            }
+            .print-table th, .print-table td {
+                border: 1px solid black !important;
+                padding: 4px !important;
+                font-size: 11pt !important;
+                color: black !important;
+            }
+            .print-text { color: black !important; }
+            @page { size: A4 portrait; margin: 1.5cm; }
+        }
+    </style>
+</head>
+<body class="bg-gray-200 p-4 md:p-8">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 no-print"></div>
+
+    <div class="max-w-7xl mx-auto flex flex-col lg:flex-row gap-6">
+        
+        <!-- Left Panel: Input Form (No Print) -->
+        <div class="no-print w-full lg:w-1/3 bg-white p-6 rounded-xl shadow-lg h-fit">
+            <h2 class="text-xl font-bold mb-4 text-gray-800 border-b pb-2">Form Pengisian</h2>
+            
+            <div class="space-y-4">
+                <!-- Identitas -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700">Nama Pegawai</label>
+                    <input type="text" id="nama" class="mt-1 w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 outline-none" placeholder="SUWITNO, S.Pd.SD." onkeyup="updatePreview()">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700">NIP</label>
+                    <input type="text" id="nip" class="mt-1 w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 outline-none" placeholder="19700228..." onkeyup="updatePreview()">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700">Jabatan</label>
+                    <textarea id="jabatan" class="mt-1 w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 outline-none" rows="2" onkeyup="updatePreview()" placeholder="Guru Ahli Muda, Guru Kelas..."></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700">Bulan/Tahun</label>
+                    <input type="text" id="bulanTahun" class="mt-1 w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Desember 2025" onkeyup="updatePreview()">
+                </div>
+
+                <div class="border-t pt-4 mt-4">
+                    <h3 class="font-semibold text-gray-800 mb-2">Tambah Kegiatan Harian</h3>
+                    <input type="text" id="hariTanggal" class="w-full mb-2 p-2 border rounded-md" placeholder="Hari, Tanggal (Senin, 01/12/2025)">
+                    <textarea id="kegiatan" class="w-full mb-2 p-2 border rounded-md" rows="2" placeholder="Uraian Kegiatan"></textarea>
+                    <input type="text" id="output" class="w-full mb-2 p-2 border rounded-md" placeholder="Output/ Hasil">
+                    <div class="flex gap-2 mb-3">
+                        <input type="number" id="volume" class="w-1/3 p-2 border rounded-md" placeholder="Vol">
+                        <input type="text" id="satuan" class="w-2/3 p-2 border rounded-md" placeholder="Satuan (Kegiatan/Dokumen)">
+                    </div>
+                    <button onclick="tambahKegiatan()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-colors">
+                        + Tambah ke Tabel
+                    </button>
+                </div>
+
+                <div class="border-t pt-4 mt-4 space-y-3">
+                    <h3 class="font-semibold text-gray-800">Data Penandatangan</h3>
+                    <input type="text" id="tglTtd" class="w-full p-2 border rounded-md text-sm" placeholder="Tanggal TTD (31 Desember 2025)" onkeyup="updatePreview()">
+                    <input type="text" id="namaAtasan" class="w-full p-2 border rounded-md text-sm" placeholder="Nama Atasan" onkeyup="updatePreview()">
+                    <input type="text" id="nipAtasan" class="w-full p-2 border rounded-md text-sm" placeholder="NIP Atasan" onkeyup="updatePreview()">
+                </div>
+
+                <div class="border-t pt-4 mt-4 flex flex-col gap-2">
+                    <button onclick="loadDummyData()" class="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-md text-sm">Muat Data Contoh</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Document Preview (Printable) -->
+        <div class="w-full lg:w-2/3 bg-white p-8 md:p-12 rounded-xl shadow-xl print-container">
+            
+            <!-- Action Buttons (No Print) -->
+            <div class="flex justify-end gap-2 mb-6 no-print border-b pb-4">
+                <button onclick="printLaporan()" class="flex items-center gap-1 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md font-medium transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                    Print
+                </button>
+                <button onclick="exportWord()" class="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    Word
+                </button>
+                <button onclick="exportExcel()" class="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-medium transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
+                    Excel
+                </button>
+            </div>
+
+            <!-- KOP Document -->
+            <div class="text-center mb-6 print-text">
+                <h1 class="font-bold text-lg leading-tight">Laporan Capaian Kinerja Harian Pegawai Negeri Sipil</h1>
+                <h2 class="font-bold text-lg leading-tight">Kantor Kementerian Agama Kab. Kotawaringin Timur</h2>
+            </div>
+
+            <!-- Identitas Document -->
+            <div class="mb-4 text-sm print-text flex flex-col gap-1">
+                <div class="flex"><span class="w-24">Nama</span><span>: <span id="prevNama"></span></span></div>
+                <div class="flex"><span class="w-24">NIP</span><span>: <span id="prevNip"></span></span></div>
+                <div class="flex"><span class="w-24">Jabatan</span><span>: <span id="prevJabatan"></span></span></div>
+                <div class="flex"><span class="w-24">Bulan/Tahun</span><span>: <span id="prevBulanTahun"></span></span></div>
+            </div>
+
+            <!-- Table Document -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm print-table border-collapse border border-gray-800 text-gray-900">
+                    <thead>
+                        <tr class="bg-gray-100 print:bg-transparent">
+                            <th class="border border-gray-800 p-2 w-12 text-center">No.</th>
+                            <th class="border border-gray-800 p-2 w-32 text-center">Hari, Tanggal</th>
+                            <th class="border border-gray-800 p-2 text-center">Kegiatan</th>
+                            <th class="border border-gray-800 p-2 w-48 text-center">Output/ Hasil/<br>Bukti Dokumen</th>
+                            <th class="border border-gray-800 p-2 w-16 text-center">Volume</th>
+                            <th class="border border-gray-800 p-2 w-24 text-center">Satuan</th>
+                            <th class="border border-gray-800 p-2 w-16 text-center no-print text-red-500">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <!-- Data rows will be injected here via JS -->
+                        <tr><td colspan="7" class="text-center py-4 text-gray-400 italic">Belum ada data kegiatan.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Tanda Tangan Document -->
+            <div class="mt-12 flex justify-between text-sm print-text">
+                <div class="text-center w-64 flex flex-col items-center">
+                    <p>Mengetahui,</p>
+                    <p>Atasan Langsung</p>
+                    <div class="h-20"></div>
+                    <p class="font-bold underline" id="prevNamaAtasan"></p>
+                    <p>NIP. <span id="prevNipAtasan"></span></p>
+                </div>
+                <div class="text-center w-64 flex flex-col items-center">
+                    <p id="prevTglTtd"></p>
+                    <p>Pegawai</p>
+                    <div class="h-20"></div>
+                    <p class="font-bold underline" id="prevNamaTtd"></p>
+                    <p>NIP. <span id="prevNipTtd"></span></p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Footer Aplikasi -->
+    <footer class="mt-8 mb-4 text-center text-sm font-semibold text-gray-500 no-print">
+        MIN 1 KOTAWARINGIN TIMUR. Kreatif By Witno.
+    </footer>
+
+    <script>
+        // Data State
+        let activities = [];
+
+        // Toast Function
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgColor = type === 'error' ? 'bg-red-500' : (type === 'success' ? 'bg-green-600' : 'bg-blue-500');
+            toast.className = `${bgColor} text-white px-4 py-3 rounded shadow-lg transition-opacity duration-300 opacity-0 flex items-center z-50 mt-2`;
+            toast.innerHTML = `<span class="text-sm font-medium">${message}</span>`;
+            
+            container.appendChild(toast);
+            requestAnimationFrame(() => toast.classList.remove('opacity-0'));
+            
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+                setTimeout(() => { if (container.contains(toast)) container.removeChild(toast); }, 300);
+            }, 3000);
+        }
+
+        // Live Preview Updater
+        function updatePreview() {
+            document.getElementById('prevNama').innerText = document.getElementById('nama').value;
+            document.getElementById('prevNamaTtd').innerText = document.getElementById('nama').value;
+            document.getElementById('prevNip').innerText = document.getElementById('nip').value;
+            document.getElementById('prevNipTtd').innerText = document.getElementById('nip').value;
+            document.getElementById('prevJabatan').innerText = document.getElementById('jabatan').value;
+            document.getElementById('prevBulanTahun').innerText = document.getElementById('bulanTahun').value;
+            
+            document.getElementById('prevTglTtd').innerText = document.getElementById('tglTtd').value;
+            document.getElementById('prevNamaAtasan').innerText = document.getElementById('namaAtasan').value;
+            document.getElementById('prevNipAtasan').innerText = document.getElementById('nipAtasan').value;
+        }
+
+        // Add Data Logic
+        function tambahKegiatan() {
+            const hariTanggal = document.getElementById('hariTanggal').value;
+            const kegiatan = document.getElementById('kegiatan').value;
+            const output = document.getElementById('output').value;
+            const volume = document.getElementById('volume').value;
+            const satuan = document.getElementById('satuan').value;
+
+            if (!kegiatan) {
+                showToast("Kolom Kegiatan wajib diisi!", "error");
+                return;
+            }
+
+            activities.push({ hariTanggal, kegiatan, output, volume, satuan });
+            
+            // Reset input form
+            document.getElementById('kegiatan').value = '';
+            document.getElementById('output').value = '';
+            // focus back to input
+            document.getElementById('kegiatan').focus();
+            
+            renderTable();
+            showToast("Kegiatan ditambahkan!", "success");
+        }
+
+        function hapusKegiatan(index) {
+            activities.splice(index, 1);
+            renderTable();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            if (activities.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-gray-400 italic">Belum ada data kegiatan.</td></tr>`;
+                return;
+            }
+
+            activities.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="border border-gray-800 p-2 text-center align-top">${index + 1}</td>
+                    <td class="border border-gray-800 p-2 align-top">${item.hariTanggal}</td>
+                    <td class="border border-gray-800 p-2 align-top">${item.kegiatan}</td>
+                    <td class="border border-gray-800 p-2 text-center align-top">${item.output}</td>
+                    <td class="border border-gray-800 p-2 text-center align-top">${item.volume}</td>
+                    <td class="border border-gray-800 p-2 text-center align-top">${item.satuan}</td>
+                    <td class="border border-gray-800 p-2 text-center no-print align-top">
+                        <button onclick="hapusKegiatan(${index})" class="text-red-500 hover:text-red-700 font-bold" title="Hapus">X</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function printLaporan() {
+            window.print();
+        }
+
+        function exportExcel() {
+            if(activities.length === 0) {
+                showToast("Tidak ada data untuk diexport", "error");
+                return;
+            }
+            try {
+                showToast("Memproses Excel...", "info");
+                const nama = document.getElementById('nama').value || 'Pegawai';
+                const wb = XLSX.utils.book_new();
+                
+                const excelData = activities.map((item, index) => ({
+                    'No.': index + 1,
+                    'Hari, Tanggal': item.hariTanggal,
+                    'Kegiatan': item.kegiatan,
+                    'Output/ Hasil/ Bukti Dokumen': item.output,
+                    'Volume': item.volume,
+                    'Satuan': item.satuan
+                }));
+
+                const ws = XLSX.utils.json_to_sheet(excelData, { origin: "A7" });
+
+                XLSX.utils.sheet_add_aoa(ws, [
+                    ["Laporan Capaian Kinerja Harian Pegawai Negeri Sipil"],
+                    ["Kantor Kementerian Agama Kab. Kotawaringin Timur"],
+                    [],
+                    ["Nama", ": " + document.getElementById('nama').value],
+                    ["NIP", ": " + document.getElementById('nip').value],
+                    ["Bulan/Tahun", ": " + document.getElementById('bulanTahun').value]
+                ], { origin: "A1" });
+
+                ws['!cols'] = [{ wch: 5 }, { wch: 20 }, { wch: 50 }, { wch: 30 }, { wch: 10 }, { wch: 15 }];
+                XLSX.utils.book_append_sheet(wb, ws, "Laporan_Kinerja");
+                
+                XLSX.writeFile(wb, `Laporan_Kinerja_${nama.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.xlsx`);
+                showToast("Berhasil mendownload Excel!", "success");
+            } catch (error) {
+                console.error(error);
+                showToast("Gagal export Excel.", "error");
+            }
+        }
+
+        function exportWord() {
+            if (activities.length === 0) {
+                showToast("Tidak ada data untuk diexport", "error");
+                return;
+            }
+            try {
+                showToast("Memproses Word...", "info");
+                
+                // Pengecekan aman library docx
+                if (typeof window.docx === 'undefined') {
+                    throw new Error("Library docx belum dimuat oleh browser.");
+                }
+
+                // Destrukturisasi dengan aman
+                const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle } = window.docx;
+                
+                // Fallback style untuk border tabel tanda tangan agar transparan
+                const safeBorderStyle = BorderStyle ? BorderStyle.NONE : "none";
+                const noBorder = { style: safeBorderStyle, size: 0, color: "FFFFFF" };
+
+                const nama = document.getElementById('nama').value || 'Nama Pegawai';
+                const nip = document.getElementById('nip').value || '-';
+                const jabatan = document.getElementById('jabatan').value || '-';
+                const bulanTahun = document.getElementById('bulanTahun').value || '-';
+                const tglTtd = document.getElementById('tglTtd').value || '31 Desember 2025';
+                const namaAtasan = document.getElementById('namaAtasan').value || 'Nama Atasan';
+                const nipAtasan = document.getElementById('nipAtasan').value || '-';
+
+                const doc = new Document({
+                    sections: [{
+                        properties: {},
+                        children: [
+                            new Paragraph({
+                                children: [new TextRun({ text: "Laporan Capaian Kinerja Harian Pegawai Negeri Sipil", bold: true, size: 24 })],
+                                alignment: AlignmentType.CENTER
+                            }),
+                            new Paragraph({
+                                children: [new TextRun({ text: "Kantor Kementerian Agama Kab. Kotawaringin Timur", bold: true, size: 24 })],
+                                alignment: AlignmentType.CENTER,
+                                spacing: { after: 400 }
+                            }),
+                            
+                            new Paragraph({ text: `Nama\t\t\t: ${nama}` }),
+                            new Paragraph({ text: `NIP\t\t\t: ${nip}` }),
+                            new Paragraph({ text: `Jabatan\t\t\t: ${jabatan}` }),
+                            new Paragraph({ text: `Bulan/Tahun\t: ${bulanTahun}`, spacing: { after: 300 } }),
+                            
+                            new Table({
+                                width: { size: 100, type: WidthType.PERCENTAGE },
+                                rows: [
+                                    new TableRow({
+                                        children: [
+                                            new TableCell({ children: [new Paragraph({ text: "No.", alignment: AlignmentType.CENTER, bold: true })] }),
+                                            new TableCell({ children: [new Paragraph({ text: "Hari, Tanggal", alignment: AlignmentType.CENTER, bold: true })] }),
+                                            new TableCell({ children: [new Paragraph({ text: "Kegiatan", alignment: AlignmentType.CENTER, bold: true })] }),
+                                            new TableCell({ children: [new Paragraph({ text: "Output/ Hasil", alignment: AlignmentType.CENTER, bold: true })] }),
+                                            new TableCell({ children: [new Paragraph({ text: "Volume", alignment: AlignmentType.CENTER, bold: true })] }),
+                                            new TableCell({ children: [new Paragraph({ text: "Satuan", alignment: AlignmentType.CENTER, bold: true })] })
+                                        ]
+                                    }),
+                                    ...activities.map((item, index) => new TableRow({
+                                        children: [
+                                            new TableCell({ children: [new Paragraph({ text: (index + 1).toString(), alignment: AlignmentType.CENTER })] }),
+                                            new TableCell({ children: [new Paragraph({ text: item.hariTanggal })] }),
+                                            new TableCell({ children: [new Paragraph({ text: item.kegiatan })] }),
+                                            new TableCell({ children: [new Paragraph({ text: item.output, alignment: AlignmentType.CENTER })] }),
+                                            new TableCell({ children: [new Paragraph({ text: item.volume, alignment: AlignmentType.CENTER })] }),
+                                            new TableCell({ children: [new Paragraph({ text: item.satuan, alignment: AlignmentType.CENTER })] })
+                                        ]
+                                    }))
+                                ]
+                            }),
+                            
+                            new Paragraph({ spacing: { before: 800 } }), 
+                            new Table({
+                                width: { size: 100, type: WidthType.PERCENTAGE },
+                                borders: { 
+                                    top: noBorder, bottom: noBorder, left: noBorder, right: noBorder, 
+                                    insideVertical: noBorder, insideHorizontal: noBorder 
+                                },
+                                rows: [
+                                    new TableRow({
+                                        children: [
+                                            new TableCell({
+                                                width: { size: 50, type: WidthType.PERCENTAGE },
+                                                children: [
+                                                    new Paragraph({ text: "Mengetahui,", alignment: AlignmentType.CENTER }),
+                                                    new Paragraph({ text: "Atasan Langsung", alignment: AlignmentType.CENTER }),
+                                                    new Paragraph({ text: "", spacing: { before: 1200 } }), 
+                                                    new Paragraph({ children: [new TextRun({ text: namaAtasan, bold: true, underline: {} })], alignment: AlignmentType.CENTER }),
+                                                    new Paragraph({ text: `NIP. ${nipAtasan}`, alignment: AlignmentType.CENTER })
+                                                ]
+                                            }),
+                                            new TableCell({
+                                                width: { size: 50, type: WidthType.PERCENTAGE },
+                                                children: [
+                                                    new Paragraph({ text: tglTtd, alignment: AlignmentType.CENTER }),
+                                                    new Paragraph({ text: "Pegawai", alignment: AlignmentType.CENTER }),
+                                                    new Paragraph({ text: "", spacing: { before: 1200 } }), 
+                                                    new Paragraph({ children: [new TextRun({ text: nama, bold: true, underline: {} })], alignment: AlignmentType.CENTER }),
+                                                    new Paragraph({ text: `NIP. ${nip}`, alignment: AlignmentType.CENTER })
+                                                ]
+                                            })
+                                        ]
+                                    })
+                                ]
+                            })
+                        ]
+                    }]
+                });
+
+                Packer.toBlob(doc).then(blob => {
+                    saveAs(blob, `Laporan_Kinerja_${nama.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.docx`);
+                    showToast("Berhasil mendownload Word!", "success");
+                }).catch(err => {
+                    console.error("Packer Error:", err);
+                    showToast("Gagal memproses file Word.", "error");
+                });
+                
+            } catch (error) {
+                console.error("Word Error:", error);
+                showToast("Terjadi kesalahan sistem Word.", "error");
+            }
+        }
+
+        function loadDummyData() {
+            document.getElementById('nama').value = "SUWITNO, S.Pd.SD.";
+            document.getElementById('nip').value = "197002281995031003";
+            document.getElementById('jabatan').value = "Guru Ahli Muda, Guru Kelas, pada MIN 1 Kotawaringin Timur Kabupaten Kotawaringin Timur Provinsi Kalimantan Tengah";
+            document.getElementById('bulanTahun').value = "Desember 2025";
+            
+            document.getElementById('tglTtd').value = "31 Desember 2025";
+            document.getElementById('namaAtasan').value = "Drs. H. MALI, M.Pd";
+            document.getElementById('nipAtasan').value = "196701161998031002";
+
+            activities = [
+                { hariTanggal: "Senin, 01/12/2025", kegiatan: "Proktor pelaksanaan Asesmen sumatif semester Ganjil, mapel Al-Quran Hadis dan PKn. Hari pertama.", output: "Asesmen Sumatif Ganjil", volume: "2", satuan: "Kegiatan" },
+                { hariTanggal: "Senin, 01/12/2025", kegiatan: "Mengoreksi dan download nilai hasil Asesmen sumatif semester 1 pada CBT kelas 6.", output: "Nilai Asesmen sumatif semester ganjil kelas 6", volume: "2", satuan: "Dokumen" },
+                { hariTanggal: "Selasa, 02/12/2025", kegiatan: "Proktor pelaksanaan Asesmen sumatif semester Ganjil, mapel Akidah Akhlak dan B.Indonesia.", output: "Asesmen Sumatif Ganjil", volume: "2", satuan: "Kegiatan" }
+            ];
+
+            updatePreview();
+            renderTable();
+            showToast("Data contoh berhasil dimuat!", "success");
+        }
+
+        // Initialize preview on load
+        window.onload = function() {
+            updatePreview();
+        };
+    </script>
+</body>
+</html>
